@@ -1,0 +1,80 @@
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: "sensitive-file-monitoring"
+  namespace: tetragon
+spec:
+  kprobes:
+    # Monitor file permission checks (more stable than sys_openat)
+    - call: "security_file_permission"
+      syscall: false
+      return: true
+      args:
+        - index: 0
+          type: "file"
+        - index: 1
+          type: "int"
+      returnArg:
+        index: 0
+        type: "int"
+      returnArgAction: "Post"
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: "Equal"
+              values:
+                - "/etc/shadow"
+                - "/etc/gshadow"
+                - "/root/.ssh/id_rsa"
+                - "/root/.ssh/id_ed25519"
+                - "/root/.ssh/id_ecdsa"
+            - index: 1
+              operator: "Equal"
+              values:
+                - "4"  # MAY_READ flag
+    
+    # Monitor memory mapping of sensitive files
+    - call: "security_mmap_file"
+      syscall: false
+      return: true
+      args:
+        - index: 0
+          type: "file"
+        - index: 1
+          type: "uint32"
+        - index: 2
+          type: "nop"
+      returnArg:
+        index: 0
+        type: "int"
+      returnArgAction: "Post"
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: "Equal"
+              values:
+                - "/etc/shadow"
+                - "/etc/gshadow"
+            - index: 1
+              operator: "Mask"
+              values:
+                - "2"  # PROT_WRITE flag
+    
+    # Monitor path truncation (file modification)
+    - call: "security_path_truncate"
+      syscall: false
+      return: true
+      args:
+        - index: 0
+          type: "path"
+      returnArg:
+        index: 0
+        type: "int"
+      returnArgAction: "Post"
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: "Prefix"
+              values:
+                - "/etc/"
+                - "/root/.ssh/"

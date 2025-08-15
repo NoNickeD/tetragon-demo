@@ -1,0 +1,83 @@
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: "privilege-escalation-detection"
+  namespace: tetragon
+spec:
+  kprobes:
+    # Monitor setuid/setgid calls
+    - call: "sys_setuid"
+      syscall: true
+      return: true
+      args:
+        - index: 0
+          type: "int"
+      returnArg:
+        index: 0
+        type: "int"
+      returnArgAction: "Post"
+      selectors:
+        # Monitor setuid to root
+        - matchArgs:
+            - index: 0
+              operator: "Equal"
+              values:
+                - "0"  # root UID
+          matchBinaries:
+            - operator: "NotIn"
+              values:
+                - "/usr/bin/sudo"
+                - "/usr/bin/su"
+                - "/usr/bin/pkexec"
+                - "/usr/sbin/sshd"
+    
+    # Monitor ptrace operations (debugging/injection)
+    - call: "sys_ptrace"
+      syscall: true
+      return: true
+      args:
+        - index: 0
+          type: "int"
+        - index: 1
+          type: "int"
+      returnArg:
+        index: 0
+        type: "int"
+      returnArgAction: "Post"
+      selectors:
+        # Monitor PTRACE_ATTACH operations
+        - matchArgs:
+            - index: 0
+              operator: "Equal"
+              values:
+                - "16"  # PTRACE_ATTACH
+                - "17"  # PTRACE_DETACH
+          matchBinaries:
+            - operator: "NotIn"
+              values:
+                - "/usr/bin/gdb"
+                - "/usr/bin/strace"
+                - "/usr/bin/ltrace"
+    
+    # Monitor kernel module operations
+    - call: "sys_init_module"
+      syscall: true
+      return: true
+      args:
+        - index: 0
+          type: "nop"
+        - index: 1
+          type: "size_t"
+        - index: 2
+          type: "string"
+      returnArg:
+        index: 0
+        type: "int"
+      returnArgAction: "Post"
+      selectors:
+        # Log all module loading attempts
+        - matchBinaries:
+            - operator: "NotIn"
+              values:
+                - "/usr/sbin/modprobe"
+                - "/usr/sbin/insmod"

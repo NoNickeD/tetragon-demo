@@ -1,0 +1,88 @@
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: "container-security"
+  namespace: tetragon
+spec:
+  kprobes:
+    # Monitor namespace operations
+    - call: "sys_unshare"
+      syscall: true
+      return: true
+      args:
+        - index: 0
+          type: "int"
+      returnArg:
+        index: 0
+        type: "int"
+      returnArgAction: "Post"
+      selectors:
+        # Monitor unshare from non-standard locations
+        - matchBinaries:
+            - operator: "NotIn"
+              values:
+                - "/usr/bin/unshare"
+                - "/usr/bin/systemd-nspawn"
+                - "/usr/bin/docker"
+                - "/usr/bin/containerd"
+                - "/usr/bin/runc"
+    
+    # Monitor capability changes
+    - call: "cap_capable"
+      syscall: false
+      return: true
+      args:
+        - index: 0
+          type: "nop"
+        - index: 1
+          type: "int"
+        - index: 2
+          type: "int"
+      returnArg:
+        index: 0
+        type: "int"
+      returnArgAction: "Post"
+      selectors:
+        # Monitor dangerous capabilities
+        - matchArgs:
+            - index: 2
+              operator: "Equal"
+              values:
+                - "21"  # CAP_SYS_ADMIN
+                - "22"  # CAP_SYS_BOOT
+                - "34"  # CAP_SYSLOG
+                - "38"  # CAP_PERFMON
+          matchBinaries:
+            - operator: "NotPrefix"
+              values:
+                - "/usr/lib/systemd/"
+                - "/usr/sbin/"
+    
+    # Monitor mount operations (container escape indicator)
+    - call: "security_sb_mount"
+      syscall: false
+      return: true
+      args:
+        - index: 0
+          type: "string"
+        - index: 1
+          type: "path"
+        - index: 2
+          type: "string"
+      returnArg:
+        index: 0
+        type: "int"
+      returnArgAction: "Post"
+      selectors:
+        # Monitor proc/sys mounts to unusual locations
+        - matchArgs:
+            - index: 2
+              operator: "Equal"
+              values:
+                - "proc"
+                - "sysfs"
+            - index: 1
+              operator: "Prefix"
+              values:
+                - "/tmp/"
+                - "/dev/shm/"

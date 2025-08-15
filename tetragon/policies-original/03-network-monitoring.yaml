@@ -1,0 +1,58 @@
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: "network-monitoring"
+  namespace: tetragon
+spec:
+  kprobes:
+    # Monitor TCP connections (non-blocking)
+    - call: "tcp_connect"
+      syscall: false
+      return: true
+      args:
+        - index: 0
+          type: "sock"
+      returnArg:
+        index: 0
+        type: "int"
+      returnArgAction: "Post"
+      selectors:
+        # Monitor connections to common mining pool ports
+        - matchArgs:
+            - index: 0
+              operator: "DPort"
+              values:
+                - "3333"   # Common mining pool port
+                - "8333"   # Bitcoin port
+                - "45700"  # Monero mining
+          matchBinaries:
+            - operator: "NotIn"
+              values:
+                # Exclude system binaries
+                - "/usr/bin/curl"
+                - "/usr/bin/wget"
+                - "/usr/lib/systemd/systemd"
+    
+    # Monitor UDP socket creation
+    - call: "udp_sendmsg"
+      syscall: false
+      return: true
+      args:
+        - index: 0
+          type: "sock"
+      returnArg:
+        index: 0
+        type: "int"
+      returnArgAction: "Post"
+      selectors:
+        # Monitor DNS exfiltration attempts (large UDP packets)
+        - matchArgs:
+            - index: 0
+              operator: "DPort"
+              values:
+                - "53"    # DNS port
+          matchBinaries:
+            - operator: "NotIn"
+              values:
+                - "/usr/lib/systemd/systemd-resolved"
+                - "/usr/bin/systemd-resolve"

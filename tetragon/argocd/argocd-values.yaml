@@ -1,0 +1,62 @@
+global:
+  domain: argocd.tetragon-demo.local
+
+configs:
+  params:
+    server.insecure: true
+    application.instanceLabelKey: argocd.argoproj.io/instance
+    
+  cm:
+    admin.enabled: true
+    timeout.reconciliation: 60s
+    url: https://argocd.tetragon-demo.local
+    
+    resource.customizations: |
+      argoproj.io/Application:
+        health.lua: |
+          hs = {}
+          hs.status = "Healthy"
+          hs.message = "Application is healthy"
+          return hs
+
+server:
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 80
+    
+  service:
+    type: ClusterIP
+    
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: argocd
+
+controller:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: argocd
+
+repoServer:
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 80
+    
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: argocd
+
+applicationSet:
+  enabled: true
+  
+notifications:
+  enabled: false

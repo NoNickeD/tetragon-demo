@@ -1,0 +1,22 @@
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: "process-execution"
+  namespace: tetragon
+spec:
+  kprobes:
+    # Monitor process execution using correct syscall name
+    - call: "__x64_sys_execve"
+      syscall: true
+      return: false
+      args:
+        - index: 0
+          type: "string"
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: "Prefix"
+              values:
+                - "/tmp/"
+                - "/dev/shm/"
+                - "/var/tmp/"

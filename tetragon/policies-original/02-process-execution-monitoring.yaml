@@ -1,0 +1,54 @@
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: "process-execution-monitoring"
+  namespace: tetragon
+spec:
+  kprobes:
+    # Monitor binary execution using security hook
+    - call: "security_bprm_creds_from_file"
+      syscall: false
+      return: false
+      args:
+        - index: 1
+          type: "file"
+      selectors:
+        # Monitor execution from suspicious locations
+        - matchArgs:
+            - index: 1
+              operator: "Prefix"
+              values:
+                - "/tmp/"
+                - "/dev/shm/"
+                - "/var/tmp/"
+          matchActions:
+            - action: Post
+        
+        # Monitor specific suspicious binaries
+        - matchArgs:
+            - index: 1
+              operator: "Postfix"
+              values:
+                - "xmrig"
+                - "minerd"
+                - "ethminer"
+                - "cgminer"
+          matchActions:
+            - action: Post
+    
+    # Monitor process credential changes
+    - call: "commit_creds"
+      syscall: false
+      return: false
+      args:
+        - index: 0
+          type: "nop"
+      selectors:
+        # Only monitor if process is running from suspicious location
+        - matchBinaries:
+            - operator: "Prefix"
+              values:
+                - "/tmp/"
+                - "/dev/shm/"
+          matchActions:
+            - action: Post

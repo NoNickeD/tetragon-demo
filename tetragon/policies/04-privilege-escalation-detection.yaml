@@ -1,0 +1,37 @@
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: "privilege-escalation"
+  namespace: tetragon
+spec:
+  kprobes:
+    # Monitor setuid (already working with correct name)
+    - call: "__x64_sys_setuid"
+      syscall: true
+      return: false
+      args:
+        - index: 0
+          type: "int"
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: "Equal"
+              values:
+                - "0"  # root UID
+    
+    # Monitor capabilities (already working)
+    - call: "cap_capable"
+      syscall: false
+      args:
+        - index: 0
+          type: "nop"
+        - index: 1
+          type: "int"
+        - index: 2
+          type: "int"
+      selectors:
+        - matchArgs:
+            - index: 2
+              operator: "Equal"
+              values:
+                - "21"  # CAP_SYS_ADMIN
