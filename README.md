@@ -462,14 +462,6 @@ tofu destroy -auto-approve
 - [OpenTofu Documentation](https://opentofu.org/docs/)
 - [ArgoCD Documentation](https://argo-cd.readthedocs.io/)
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Author
-
-Created by NN - [Blog Post](https://srekubecraft.io/posts/tetragon/)
-
 ---
 
 **Note**: This is a demonstration environment. For production use, ensure proper security hardening, network isolation, and compliance with your organization's security policies.
